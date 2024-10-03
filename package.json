@@ -7,8 +7,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "comm": "node deploy-commands.js",
-    "delcomm": "node delete-commands.js"
+    "command": "node deploy-commands.js",
+    "delcommand": "node delete-commandsGlobal.js"
   },
   "keywords": [],
   "author": "",

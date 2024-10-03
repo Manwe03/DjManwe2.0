@@ -17,6 +17,8 @@ let swapBufferEmpty = true;
 
 let lastStateChange = 0;
 
+let alreadyHandled = false;
+
 const yt_dlp = "C:\\Git\\DiscordApp\\DJManwe\\lib\\yt-dlp.exe"
 
 function getAudioPlayer() {
@@ -69,18 +71,16 @@ export function getPlaylistYoutube(youtubeUrl) {
         return null;
     }
     
-
-    const playlistString = ytProcess.stdout.toString().trim().slice(1)
-    const playlistArray = playlistString.split('"\n"');
-    const length = playlistArray.length
-    const reversedArray = []
-    for(let i = 0; i<length; i++){
-        reversedArray.push(playlistArray.pop())
+    const playlistArray = ytProcess.stdout.toString().split('\n')
+    const playlist = new Array(playlistArray.length - 1);
+    for (let i = 0; i < playlistArray.length - 1; i++) {
+        playlist[i] = playlistArray[i].slice(1, -1)
     }
-    return reversedArray;
+    //console.log(playlist)
+    return playlist
 }
 
-export function streamYouTubeSwap(channel, youtubeUrl, youtubeUrl2) {
+export function streamYouTubeSwap(channel, youtubeUrl, youtubeUrl2,replaceBuffers) {
     if (!channel) {
         console.error("Voice channel not found!");
         return;
@@ -97,7 +97,12 @@ export function streamYouTubeSwap(channel, youtubeUrl, youtubeUrl2) {
         });
     }
 
-    if(swapBufferEmpty){
+    if(replaceBuffers){
+        console.log("Salto a una cancion no cargada")
+        loadToPlayBuffer(youtubeUrl,()=> {playFromBuffer()});
+        loadToSwapBuffer(youtubeUrl2)
+    }
+    else if(swapBufferEmpty){
         console.log("[ ][ ] o [x][ ]")
         //cargar en el playbuffer youtubeUrl //lanzar cancion
         loadToPlayBuffer(youtubeUrl,()=> {playFromBuffer()});
@@ -108,22 +113,27 @@ export function streamYouTubeSwap(channel, youtubeUrl, youtubeUrl2) {
             //cargar en el swapbuffer youtubeUrl2
             loadToSwapBuffer(youtubeUrl2)
         }
-    }else if(!swapBufferEmpty){
+    }
+    else if(!swapBufferEmpty){
         console.log("[x][x]")
 
         //wait fill
+        //console.log("Esperando swapbuffer...")
         waitForFullSwapBuffer()
+        //console.log("Continuando")
         //swapbuffer to playbuffer
         let ref = playBuffer
         playBuffer = swapBuffer
         swapBuffer = ref
         //lanzar cancion
+        //console.log("Launch")
         playFromBuffer()
 
         if(youtubeUrl2 == undefined){
             swapBufferEmpty = true
         }else{
             //cargar en el swapbuffer youtubeUrl2
+            //console.log("Llenando swapbuffer")
             loadToSwapBuffer(youtubeUrl2)
         }
         
@@ -133,26 +143,28 @@ export function streamYouTubeSwap(channel, youtubeUrl, youtubeUrl2) {
 }
 
 function playFromBuffer(){
-    const stream = Readable.from(playBuffer)
+    const stream = Readable.from(playBuffer.subarray(0, playBufferLength))
     const resource = createAudioResource(stream, { inputType: 'arbitrary' });
-    getAudioPlayer().stop()
+
     getAudioPlayer().play(resource);
     connection.subscribe(getAudioPlayer());
 
     getAudioPlayer().on('stateChange', (oldState, newState) => {
-        const now = Date.now();
-        if (now - lastStateChange >= 2000) {
-            lastStateChange = now; // Actualiza el tiempo del último cambio de estado
-
-            if (newState.status === 'idle' && oldState.status !== 'idle') {
-                console.log('El audio ha finalizado la reproducción.');
-                // Llama a la función para pasar a la siguiente canción
-                triggerNextSongInQueue();
-            }
+        if (newState.status === 'idle' && oldState.status !== 'idle' && !alreadyHandled) {
+            console.log('El audio ha finalizado la reproducción.');
+            alreadyHandled = true //bloquea bandera handle autoskip
+            // Llama a la función para pasar a la siguiente canción
+            triggerNextSongInQueue();
+            setTimeout(() => {
+                alreadyHandled = false;
+            }, 1000); // Establecer un pequeño retraso antes de permitir un nuevo evento
         }
     });
-
-    //console.log(playBuffer)
+    getAudioPlayer().on('error', (error) => {
+        console.error('Error en la reproducción de audio:', error.message);
+        // Detén la reproducción si ocurre un error
+        stopStreamYouTube();
+    });
 }
 
 export async function loadToSwapBuffer(youtubeUrl) {

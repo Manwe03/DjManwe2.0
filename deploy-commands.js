@@ -4,18 +4,37 @@ dotenv.config();
 
 const commands = [
     {
-        name: 'dj',
+        name: 'play',
         description: 'Reproduce una canción',
         options: [
             {
                 name: 'url',
                 description: 'URL de youtube',
                 type: 3, // Type 3 es para texto (STRING)
-                required: true,
-                autocomplete: true,
+                required: true
             },
         ],
     },
+    {
+        name: 'skip',
+        description: 'Salta una canción',
+        options: [
+            {
+                name: 'n',
+                description: 'numero',
+                type: 3,
+                required: false
+            },
+        ],
+    },
+    {
+        name: 'stop',
+        description: 'Para y borra la playlist'
+    },
+    {
+        name: 'shuffle',
+        description: 'Mezcla la playlist'
+    }
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
